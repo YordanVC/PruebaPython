@@ -9,15 +9,15 @@ from cryptography.fernet import Fernet
 key = Fernet.generate_key()
 f = Fernet(key)
 
-user = APIRouter()
+user = APIRouter(prefix="/users", tags=["users"])
 
 
-@user.get("/users", response_model=list[User])
+@user.get("", response_model=list[User])
 def read_root():
     return conn.execute(users.select()).fetchall()
 
 
-@user.post("/users", response_model=User)
+@user.post("", response_model=User)
 def create_user(user: User):
     new_user = {
         "name": user.name,
@@ -35,7 +35,7 @@ def create_user(user: User):
     return inserted_user._asdict()
 
 
-@user.get("/users/{id}", response_model=User)
+@user.get("/{id}", response_model=User)
 def get_user_by_id(id: int):
     inserted_user = conn.execute(
         users.select().where(
@@ -47,26 +47,30 @@ def get_user_by_id(id: int):
         raise HTTPException(status_code=404, detail="User not found")
 
 
-@user.delete("/users/{id}")
+@user.delete("/{id}")
 def delete_user(id: int):
-    result = conn.execute(
-        users.delete().where(
-            users.c.id == id)
-    )
+    with engine.begin() as conn:
+        result = conn.execute(
+            users.delete().where(
+                users.c.id == id)
+        )
+
     return ("user deleted" if result.rowcount > 0
             else {"error": "User not found"})
 
 
-@user.put("/users/{id}", response_model=User)
+@user.put("/{id}", response_model=User)
 def update_user(id: int, user: User):
-    conn.execute(
-        users.update().values(
-            name=user.name,
-            email=user.email,
-            password=f.encrypt(user.password.encode("utf-8")).decode("utf-8")
-        ).where(
-            users.c.id == id)
-    )
+    with engine.begin() as conn:
+        conn.execute(
+            users.update().values(
+                name=user.name,
+                email=user.email,
+                password=f.encrypt(
+                    user.password.encode("utf-8")).decode("utf-8")
+            ).where(
+                users.c.id == id)
+        )
     user_updated = get_user_by_id(id)
     if user_updated:
         return user_updated
