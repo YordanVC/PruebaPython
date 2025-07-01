@@ -57,9 +57,9 @@ def delete_user(id: int):
             else {"error": "User not found"})
 
 
-@user.put("/users/{id}")
+@user.put("/users/{id}", response_model=User)
 def update_user(id: int, user: User):
-    result = conn.execute(
+    conn.execute(
         users.update().values(
             name=user.name,
             email=user.email,
@@ -67,5 +67,8 @@ def update_user(id: int, user: User):
         ).where(
             users.c.id == id)
     )
-    return (get_user_by_id(id) if result.rowcount > 0
-            else {"error": "User not found"})
+    user_updated = get_user_by_id(id)
+    if user_updated:
+        return user_updated
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
